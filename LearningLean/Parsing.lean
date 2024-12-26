@@ -1,5 +1,6 @@
 import Mathlib.Logic.Basic
 import Mathlib.Control.Functor
+import Mathlib.Control.Lawful
 
 -- An individual parsing error located at a specific span
 def Error := String
@@ -48,3 +49,10 @@ theorem map_with_produces_new_output {α β : Type} [ToString α] [BEq α] [Refl
   simp
   simp [just_matches_x_with_x]
   congr
+
+theorem try_map_with_produces_new_output {α β : Type} [ToString α] [BEq α] [ReflBEq α] (a : α) (b : β) (f : Parser α β) (h : (f a) = pure b) : tryMapWith f (just a) a = pure b := by
+  unfold tryMapWith
+  unfold Bind.kleisliLeft
+  unfold just
+  simp
+  exact h
