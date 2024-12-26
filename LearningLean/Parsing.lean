@@ -1,4 +1,5 @@
 import Mathlib.Logic.Basic
+import Mathlib.Control.Functor
 
 -- An individual parsing error located at a specific span
 def Error := String
@@ -21,10 +22,12 @@ def filter {α : Type} [ToString α] : (α -> Bool) -> Parser α α := flip filt
 -- Convert a parsed element into another element
 def mapWith {α β γ : Type} : (β -> γ) -> Parser α β -> Parser α γ := (Function.comp) ∘ Functor.map
 
+--- Fallible mapping from one parser to another
+def tryMapWith {α β γ : Type} : Parser β γ -> Parser α β -> Parser α γ := Bind.kleisliLeft
+
 theorem just_matches_x_with_x {α : Type} [BEq α] [ReflBEq α] [ToString α] (x : α) : just x x = pure x := by
   unfold just
-  simp [← BEq.refl]
-  simp
+  simp [BEq.refl]
 
 theorem just_does_not_match_a_with_b {α : Type} [BEq α] [ToString α] (a : α) (b : α) (h : ¬(b == a)) : just a b = Except.error s!"found {b}; expected {a}" := by
   unfold just
@@ -39,3 +42,9 @@ theorem filter_does_not_match_in_with_bad_f {α : Type} [ToString α] (a : α) (
   unfold filterExpected
   simp
   simp [h]
+
+theorem map_with_produces_new_output {α β : Type} [ToString α] [BEq α] [ReflBEq α] (a : α) (b : β) (f : (α -> β)) (h : (f a) = b) : mapWith f (just a) a = pure b := by
+  unfold mapWith
+  simp
+  simp [just_matches_x_with_x]
+  congr
