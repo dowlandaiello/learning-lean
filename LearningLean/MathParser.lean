@@ -24,9 +24,10 @@ inductive Token where
 deriving Repr
 
 -- Combines tokens of similar type into larger numbers
+def joinDigit : Nat -> (Prod Nat Nat) -> Nat
+    | acc, (place, digit) => acc + (digit * (Nat.pow 10 place))
+
 def joinNums (nums : List Nat) : Nat :=
-    let joinDigit : Nat -> (Prod Nat Nat) -> Nat
-    | acc, (digit, place) => acc + (digit * (Nat.pow 10 place))
     List.enum nums |> List.foldl joinDigit 0
 
 instance : ToString Token :=
@@ -84,5 +85,12 @@ def pOperator : Parser Char Token
 def pMap {a b c : Type} (p1 : Parser a b) (f : b -> c) : Parser a c :=
     fun stream => (p1 stream).map f
 
-def parseToken : RepParser Char Token := pChoice [pMap pDigit Token.Digit, pOperator] |> pRepeated
+def just {a : Type} [BEq a] (val : a) : Parser a a :=
+    fun src : a => if src == val then some src else none
+
+def adjacentDigits : 
+
+def parseToken : RepParser Char Token :=
+    let tokens := pChoice [pMap pDigit Token.Digit, pOperator] |> pRepeated
+    
 
