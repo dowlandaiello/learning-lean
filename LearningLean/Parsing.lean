@@ -11,9 +11,15 @@ def Parser (α β : Type) := α -> Except Error β
 def just {α : Type} [BEq α] [ToString α] : α -> Parser α α
   | a => fun e => if e == a then pure e else Except.error s!"found {e}; expected {a}"
 
+-- Matches some element that fits a predicate with a reason explaining why the predicate failed
 def filterExpected {α : Type} [ToString α] : (α -> Bool) -> Option String -> Parser α α
   | f, expected => fun e => if f e then pure e else Except.error s!"predicate match failed: found {e}; expected {expected}"
 
+-- Matches some element that fits a predicate
+def filter {α : Type} [ToString α] : (α -> Bool) -> Parser α α := flip filterExpected none
+
+-- Convert a parsed element into another element
+def mapWith {α β γ : Type} : (β -> γ) -> Parser α β -> Parser α γ := (Function.comp) ∘ Functor.map
 
 theorem just_matches_x_with_x {α : Type} [BEq α] [ReflBEq α] [ToString α] (x : α) : just x x = pure x := by
   unfold just
