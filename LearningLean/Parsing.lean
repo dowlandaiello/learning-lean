@@ -13,11 +13,11 @@ def Parser (α β : Type) := α -> Except Error β
 
 -- Matches a specific element, and produces some output after parsing
 def just {α : Type} [BEq α] [ToString α] : α -> Parser α α
-  | a => fun e => if e == a then pure e else Except.error s!"found {e}; expected {a}"
+  | a => λ e => if e == a then pure e else Except.error s!"found {e}; expected {a}"
 
 -- Matches some element that fits a predicate with a reason explaining why the predicate failed
 def filterExpected {α : Type} [ToString α] : (α -> Bool) -> Option String -> Parser α α
-  | f, expected => fun e => if f e then pure e else Except.error s!"predicate match failed: found {e}; expected {expected}"
+  | f, expected => λ e => if f e then pure e else Except.error s!"predicate match failed: found {e}; expected {expected}"
 
 -- Matches some element that fits a predicate
 def filter {α : Type} [ToString α] : (α -> Bool) -> Parser α α := flip filterExpected none
@@ -31,13 +31,17 @@ def tryMapWith {α β γ : Type} : Parser β γ -> Parser α β -> Parser α γ 
 -- Matches anything in the parser
 def any {α : Type} : Parser α α := pure
 
+-- Parser that discards its input, producing an error message
+def failWith {α : Type} : String -> Parser α α
+  | msg => λ _ => Except.error msg
+
 -- Parse multiple occurrences of an element
 def repeatedN {α β : Type} : ℕ -> Parser α β -> Parser (List α) (List β)
   | n, p => Monad.sequence ∘ List.map p ∘ List.take n
 
 -- Parse infinite occurrences of an element until the parser fails
 def repeated {α β : Type} : Parser α β -> Parser (List α) (List β)
-  | p => let isOk := fun (x : Except Error β) =>
+  | p => let isOk := λ (x : Except Error β) =>
     match x with
     | Except.ok _    => true
     | Except.error _ => false
@@ -45,12 +49,23 @@ def repeated {α β : Type} : Parser α β -> Parser (List α) (List β)
 
 -- Parse one element after another
 def andThen {α β γ: Type} : Parser α γ -> Parser α β -> Parser (List α) (β × γ)
-  | pB, pA => fun elems => match elems with
+  | pB, pA => λ elems => match elems with
     | a :: b :: _ => do
-      let (resA : β) <- pA a
+      let resA <- pA a
       let resB <- pB b
       return (resA, resB)
     | otherwise => Except.error s!"found {List.length otherwise}; expected at least 2 elems"
+
+-- Tries one parser on an input or another on failure
+def orParse {α β : Type} : Parser α β -> Parser α β -> Parser α β
+  | pB, pA => λ e => (pB e) <|> (pA e)
+
+def choice {α β : Type} : List (Parser α β) -> Parser α β
+  | parsers => let rec firstRight := λ x => match x with
+    | (Except.ok x) :: _ => pure x
+    | (Except.error e) :: xs => (Except.error e) <|> firstRight xs
+    | _ => Except.error "exhausted all parsers"
+    λ e => firstRight (List.map (λ p => p e) parsers)
 
 theorem just_matches_x_with_x {α : Type} [BEq α] [ReflBEq α] [ToString α] (x : α) : just x x = pure x := by
   unfold just
@@ -109,3 +124,19 @@ theorem and_then_parses_multiple {α : Type} (a : α) (p : Parser α α) (h : p 
     subst h
     unfold any
     simp [bind_pure]
+
+theorem fail_with_produces_msg_always {α : Type} (a : α) (msg : String) : failWith msg a = Except.error msg := by
+  unfold failWith
+  rfl
+
+theorem choice_does_fallback {α : Type} (a : α) (p1 : Parser α α) (p2 : Parser α α) (h1 : p1 = failWith "bruh") (h2 : p2 = any) : choice [p1, p2] a = pure a := by
+  unfold choice
+  unfold choice.firstRight
+  simp
+  simp [h1, h2]
+  unfold failWith
+  unfold any
+  unfold HOrElse.hOrElse
+  unfold choice.firstRight
+  simp
+  simp [Except.tryCatch, tryCatch, MonadExceptOf.tryCatch, tryCatchThe, tryCatch, MonadExcept.orElse, OrElse.orElse, instHOrElseOfOrElse, Except.pure, pure]
