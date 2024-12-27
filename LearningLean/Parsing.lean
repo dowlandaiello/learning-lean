@@ -56,16 +56,31 @@ def andThen {α β γ: Type} : Parser α γ -> Parser α β -> Parser (List α) 
       return (resA, resB)
     | otherwise => Except.error s!"found {List.length otherwise}; expected at least 2 elems"
 
--- Tries one parser on an input or another on failure
-def orParse {α β : Type} : Parser α β -> Parser α β -> Parser α β
-  | pB, pA => λ e => (pB e) <|> (pA e)
-
 def choice {α β : Type} : List (Parser α β) -> Parser α β
   | parsers => let rec firstRight := λ x => match x with
     | (Except.ok x) :: _ => pure x
     | (Except.error e) :: xs => (Except.error e) <|> firstRight xs
     | _ => Except.error "exhausted all parsers"
     λ e => firstRight (List.map (λ p => p e) parsers)
+
+-- Tries one parser on an input or another on failure
+def orParse {α β : Type} : Parser α β -> Parser α β -> Parser α β
+  | pB, pA => choice [pA, pB]
+
+-- Parses ascii digits
+def digit : Parser Char ℕ :=
+  let parsers := List.map (λ i => mapWith (λ _ => i) (just (Char.ofNat i))) (List.range 10)
+  choice parsers
+
+-- Parses whitespace unicode characters
+def whitespace : Parser Char Char := filterExpected Char.isWhitespace (pure "whitespace")
+
+-- Parser that turns matched input into Some(input)
+def accepted {α β : Type} : Parser α β -> Parser α (Option β) := mapWith pure
+
+-- Parser that discards matched input
+def ignore {α β : Type} : Parser α β -> Parser α (Option β) :=
+  mapWith (λ _ => none)
 
 theorem just_matches_x_with_x {α : Type} [BEq α] [ReflBEq α] [ToString α] (x : α) : just x x = pure x := by
   unfold just
