@@ -79,7 +79,7 @@ def whitespace : Parser Char Char := filterExpected Char.isWhitespace (pure "whi
 def accepted {α β : Type} : Parser α β -> Parser α (Option β) := mapWith pure
 
 -- Parser that discards matched input
-def ignore {α β : Type} : Parser α β -> Parser α (Option β) :=
+def ignore {α β γ : Type} : Parser α β -> Parser α (Option γ) :=
   mapWith (λ _ => none)
 
 theorem just_matches_x_with_x {α : Type} [BEq α] [ReflBEq α] [ToString α] (x : α) : just x x = pure x := by
