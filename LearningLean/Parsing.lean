@@ -43,6 +43,15 @@ def repeated {α β : Type} : Parser α β -> Parser (List α) (List β)
     | Except.error _ => false
     Monad.sequence ∘ List.takeWhile isOk ∘ List.map p
 
+-- Parse one element after another
+def andThen {α β γ: Type} : Parser α γ -> Parser α β -> Parser (List α) (β × γ)
+  | pB, pA => fun elems => match elems with
+    | a :: b :: _ => do
+      let (resA : β) <- pA a
+      let resB <- pB b
+      return (resA, resB)
+    | otherwise => Except.error s!"found {List.length otherwise}; expected at least 2 elems"
+
 theorem just_matches_x_with_x {α : Type} [BEq α] [ReflBEq α] [ToString α] (x : α) : just x x = pure x := by
   unfold just
   simp [BEq.refl]
@@ -78,7 +87,6 @@ theorem any_matches_anything {α : Type} (a : α) : any a = pure a := by
   unfold any
   rfl
 
--- ⊢ (Monad.toBind.1 (pure h) fun h' => Monad.toBind.1 (pure xs) fun t' => pure (h' :: t')) = pure (h :: xs)
 lemma sequence_map_pure {m : Type -> Type} {α : Type} [Monad m] [LawfulMonad m] (xs : List α) : Monad.sequence (List.map pure xs) = (pure : List α -> m (List α)) xs := by
   induction xs with
   | nil => simp [Monad.sequence]
@@ -94,4 +102,10 @@ theorem can_match_repeated {α : Type} (n : ℕ) (l : List α) (f : Parser α α
     | nil => simp [Monad.sequence, List.map]
     | cons x xs => simp [Monad.sequence, any]; rw [← List.map_take]; rw [sequence_map_pure]; simp [bind_pure]
 
-
+theorem and_then_parses_multiple {α : Type} (a : α) (p : Parser α α) (h : p = any) :
+  andThen p p [a, a]  = pure (Prod.mk a a) := by
+    unfold andThen
+    simp
+    subst h
+    unfold any
+    simp [bind_pure]
