@@ -1,6 +1,8 @@
 import Mathlib.Logic.Basic
 import Mathlib.Control.Functor
 import Mathlib.Control.Lawful
+import Mathlib.Order.Filter.Basic
+import Init.Control.Lawful.Instances
 
 -- An individual parsing error located at a specific span
 def Error := String
@@ -25,6 +27,13 @@ def mapWith {α β γ : Type} : (β -> γ) -> Parser α β -> Parser α γ := (F
 
 --- Fallible mapping from one parser to another
 def tryMapWith {α β γ : Type} : Parser β γ -> Parser α β -> Parser α γ := Bind.kleisliLeft
+
+-- Matches anything in the parser
+def any {α : Type} : Parser α α := pure
+
+-- Parse multiple occurrences of an element
+def repeatedN {α β : Type} : ℕ -> Parser α β -> Parser (List α) (List β)
+  | n, p => Monad.sequence ∘ List.map p ∘ List.take n
 
 theorem just_matches_x_with_x {α : Type} [BEq α] [ReflBEq α] [ToString α] (x : α) : just x x = pure x := by
   unfold just
@@ -56,3 +65,25 @@ theorem try_map_with_produces_new_output {α β : Type} [ToString α] [BEq α] [
   unfold just
   simp
   exact h
+
+theorem any_matches_anything {α : Type} (a : α) : any a = pure a := by
+  unfold any
+  rfl
+
+-- ⊢ (Monad.toBind.1 (pure h) fun h' => Monad.toBind.1 (pure xs) fun t' => pure (h' :: t')) = pure (h :: xs)
+lemma sequence_map_pure {m : Type -> Type} {α : Type} [Monad m] [LawfulMonad m] (xs : List α) : Monad.sequence (List.map pure xs) = (pure : List α -> m (List α)) xs := by
+  induction xs with
+  | nil => simp [Monad.sequence]
+  | cons h xc ih => simp [Monad.sequence]; rw [ih]; rw [pure_bind]
+
+theorem can_match_repeated {α : Type} (n : ℕ) (l : List α) (f : Parser α α) (h : f = any) : repeatedN n f l = pure (List.take n l) := by
+  unfold repeatedN
+  simp
+  simp [h]
+  induction n with
+  | zero => simp [Monad.sequence, List.take]
+  | succ n => induction l with
+    | nil => simp [Monad.sequence, List.map]
+    | cons x xs => simp [Monad.sequence, any]; rw [← List.map_take]; rw [sequence_map_pure]; simp [bind_pure]
+
+
