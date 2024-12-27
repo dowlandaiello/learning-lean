@@ -35,6 +35,14 @@ def any {α : Type} : Parser α α := pure
 def repeatedN {α β : Type} : ℕ -> Parser α β -> Parser (List α) (List β)
   | n, p => Monad.sequence ∘ List.map p ∘ List.take n
 
+-- Parse infinite occurrences of an element until the parser fails
+def repeated {α β : Type} : Parser α β -> Parser (List α) (List β)
+  | p => let isOk := fun (x : Except Error β) =>
+    match x with
+    | Except.ok _    => true
+    | Except.error _ => false
+    Monad.sequence ∘ List.takeWhile isOk ∘ List.map p
+
 theorem just_matches_x_with_x {α : Type} [BEq α] [ReflBEq α] [ToString α] (x : α) : just x x = pure x := by
   unfold just
   simp [BEq.refl]
